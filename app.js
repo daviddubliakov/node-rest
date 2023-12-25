@@ -9,11 +9,11 @@ const feedRoutes = require('./routes/feed');
 const app = express();
 
 const fileStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
+  destination: (_req, _file, cb) => {
     cb(null, 'images');
   },
-  filename: (req, file, cb) => {
-    cb(null, new Date().toISOString() + '-' + file.originalname);
+  filename: (_req, file, cb) => {
+    cb(null, new Date().getTime() + '-' + file.originalname);
   },
 });
 
