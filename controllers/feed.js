@@ -1,6 +1,6 @@
 const { validationResult } = require('express-validator');
-const fs = require("fs");
-const path = require("path");
+const fs = require('fs');
+const path = require('path');
 
 const Post = require('../models/post');
 
@@ -109,7 +109,7 @@ exports.updatePost = (req, res, next) => {
   }
 
   if (!imageUrl) {
-    const error = new Error("No file picked");
+    const error = new Error('No file picked');
     error.statusCode = 422;
 
     throw error;
@@ -146,7 +146,37 @@ exports.updatePost = (req, res, next) => {
     });
 };
 
+exports.deletePost = (req, res, next) => {
+  const { postId } = req.params;
+
+  Post.findById(postId)
+    .then((post) => {
+      if (!post) {
+        const error = new Error('No post found');
+        error.statusCode = 404;
+
+        throw error;
+      }
+
+      // Checked logged in
+
+      clearImage(post.imageUrl);
+      return Post.findByIdAndRemove(postId);
+    })
+    .then((result) => {
+      console.log(result);
+      res.status(200).json({ message: 'Deleted post.' });
+    })
+    .catch((err) => {
+      if (!err.statusCode) {
+        err.statusCode = 500;
+      }
+
+      next(err);
+    });
+};
+
 const clearImage = (filePath) => {
   filePath = path.join(__dirname, '..', filePath);
-  fs.unlink(filePath, err => console.log(err));
-}
+  fs.unlink(filePath, (err) => console.log(err));
+};
