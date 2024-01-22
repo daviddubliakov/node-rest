@@ -1,3 +1,5 @@
+const { Server } = require('socket.io');
+const { createServer } = require('node:http');
 const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
@@ -8,6 +10,12 @@ const feedRoutes = require('./routes/feed');
 const authRoutes = require('./routes/auth');
 
 const app = express();
+const server = createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: 'http://localhost:3000',
+  },
+});
 
 const fileStorage = multer.diskStorage({
   destination: (_req, _file, cb) => {
@@ -63,9 +71,9 @@ mongoose
     'mongodb+srv://david:david2002@cluster0.i8xwsri.mongodb.net/messages',
   )
   .then(() => {
-    console.log('SERVER IS STARTED !!!');
-    const server = app.listen(8080);
-    const io = require('socket.io')(server);
+    server.listen(8080, () => {
+      console.log('SERVER IS STARTED !!!');
+    });
 
     io.on('connection', (socket) => {
       console.log('Client connnected!');
