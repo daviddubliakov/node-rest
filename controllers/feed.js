@@ -1,9 +1,11 @@
 const { validationResult } = require('express-validator');
 const fs = require('fs');
 const path = require('path');
+const io = require('../socket');
 
 const Post = require('../models/post');
 const User = require('../models/user');
+const user = require('../models/user');
 
 exports.getPosts = (req, res, next) => {
   const currentPage = req.query.page || 1;
@@ -16,6 +18,7 @@ exports.getPosts = (req, res, next) => {
       totalItems = count;
 
       return Post.find()
+        .populate('creator')
         .skip((currentPage - 1) * perPage)
         .limit(perPage);
     })
@@ -66,7 +69,7 @@ exports.createPost = (req, res, next) => {
   post
     .save()
     .then(() => {
-      return User.findById(req.userId);
+      return User.findById(userId);
     })
     .then((user) => {
       creator = user;
@@ -74,6 +77,10 @@ exports.createPost = (req, res, next) => {
       return user.save();
     })
     .then(() => {
+      io.getIO().emit('posts', {
+        action: 'create',
+        post: { ...post._doc, creator: { _id: userId, name: creator.name } },
+      });
       res.status(201).json({
         post: post,
         message: 'Post created successfully',
