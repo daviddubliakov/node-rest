@@ -1,17 +1,14 @@
-const { init } = require('./socket');
-const { createServer } = require('node:http');
 const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 const path = require('path');
 const multer = require('multer');
+const { graphqlHTTP } = require('express-graphql');
 
-const feedRoutes = require('./routes/feed');
-const authRoutes = require('./routes/auth');
+const graphqlSchema = require('./graphql/schema');
+const graphqlResolver = require('./graphql/resolvers');
 
 const app = express();
-const server = createServer(app);
-const io = init(server);
 
 const fileStorage = multer.diskStorage({
   destination: (_req, _file, cb) => {
@@ -50,8 +47,25 @@ app.use((_req, res, next) => {
   next();
 });
 
-app.use('/feed', feedRoutes);
-app.use('/auth', authRoutes);
+app.use(
+  '/graphql',
+  graphqlHTTP({
+    schema: graphqlSchema,
+    rootValue: graphqlResolver,
+    graphiql: true,
+    formatError(err) {
+      if (!err.originalError) {
+        return err;
+      }
+
+      const data = err.originalError.data;
+      const message = err.message || 'An error occuered.';
+      const code = err.originalError.code || 500;
+
+      return { message, status: code, data };
+    },
+  }),
+);
 
 app.use((error, _req, res, _next) => {
   console.log(error);
@@ -67,12 +81,8 @@ mongoose
     'mongodb+srv://david:david2002@cluster0.i8xwsri.mongodb.net/messages',
   )
   .then(() => {
-    server.listen(8080, () => {
+    app.listen(8080, () => {
       console.log('SERVER IS STARTED !!!');
-    });
-
-    io.on('connection', (socket) => {
-      console.log('Client connnected!');
     });
   })
   .catch((err) => console.log(err));
