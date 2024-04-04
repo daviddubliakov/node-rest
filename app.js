@@ -1,17 +1,17 @@
-const { init } = require('./socket');
-const { createServer } = require('node:http');
+const path = require('path');
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
-const path = require('path');
 const multer = require('multer');
+const { graphqlHTTP } = require('express-graphql');
 
-const feedRoutes = require('./routes/feed');
-const authRoutes = require('./routes/auth');
+const graphqlSchema = require('./graphql/schema');
+const graphqlResolver = require('./graphql/resolvers');
+const auth = require('./middleware/auth');
+const { clearImage } = require('./util/file');
 
 const app = express();
-const server = createServer(app);
-const io = init(server);
 
 const fileStorage = multer.diskStorage({
   destination: (_req, _file, cb) => {
@@ -40,18 +40,57 @@ app.use(
 );
 app.use('/images', express.static(path.join(__dirname, 'images')));
 
-app.use((_req, res, next) => {
+app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader(
     'Access-Control-Allow-Methods',
     'GET, POST, PUT, PATCH, DELETE, OPTIONS',
   );
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
   next();
 });
 
-app.use('/feed', feedRoutes);
-app.use('/auth', authRoutes);
+app.use(auth);
+
+app.put('/post-image', (req, res, next) => {
+  if (!req.isAuth) {
+    throw new Error('Not authenticated!');
+  }
+  if (!req.file) {
+    return res.status(200).json({ message: 'No file provided!' });
+  }
+  if (req.body.oldPath) {
+    clearImage(req.body.oldPath);
+  }
+
+  return res
+    .status(201)
+    .json({ message: 'File stored.', filePath: req.file.path });
+});
+
+app.use(
+  '/graphql',
+  graphqlHTTP({
+    schema: graphqlSchema,
+    rootValue: graphqlResolver,
+    graphiql: true,
+    formatError(err) {
+      if (!err.originalError) {
+        return err;
+      }
+
+      const data = err.originalError.data;
+      const message = err.message || 'An error occuered.';
+      const code = err.originalError.code || 500;
+
+      return { message, status: code, data };
+    },
+  }),
+);
 
 app.use((error, _req, res, _next) => {
   console.log(error);
@@ -67,12 +106,8 @@ mongoose
     'mongodb+srv://david:david2002@cluster0.i8xwsri.mongodb.net/messages',
   )
   .then(() => {
-    server.listen(8080, () => {
+    app.listen(8080, () => {
       console.log('SERVER IS STARTED !!!');
-    });
-
-    io.on('connection', (socket) => {
-      console.log('Client connnected!');
     });
   })
   .catch((err) => console.log(err));
